@@ -14,6 +14,6 @@ export const PeerAudio = ({ peer, muted }: PeerAudioProps) => {
   }, [peer]);
 
   return (
-    <audio playsInline autoPlay ref={ref} muted={muted} />
+    <audio ref={ref} muted={muted} playsInline autoPlay />
   );
 };

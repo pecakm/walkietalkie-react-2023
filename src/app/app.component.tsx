@@ -4,10 +4,13 @@ import Peer from 'simple-peer';
 import useSound from 'use-sound';
 
 import { PeerAudio } from '../components/peerAudio/peerAudio.component';
+import { RoomContent } from '../components/roomContent/roomContent.component';
+import { RoomList } from '../components/roomList/roomList.component';
 import wtSfx from '../sounds/wt.mp3';
 import { TurnCredentials } from '../interfaces/turnCredentials.interface';
 
 import { getIceConfig } from './app.utils';
+import { Container } from './app.styled';
 
 const socket = io(`${process.env.REACT_APP_SOCKET_URL}`);
 
@@ -32,12 +35,14 @@ export const App = () => {
   }, []);
 
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then((mediaStream) => {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((media) => {
+      const mediaStream = new MediaStream();
+      const audioTracks = media.getAudioTracks();
       setStream(mediaStream);
       myAudio.current.srcObject = mediaStream;
-      const audioTracks = mediaStream.getAudioTracks();
 
       if (audioTracks?.length) {
+        mediaStream.addTrack(audioTracks[0]);
         audioTracks[0].enabled = false;
       }
     });
@@ -69,7 +74,10 @@ export const App = () => {
     });
 
     socket.on('userJoined', (socketId) => {
-      setPeers((prev) => [...prev, { socketId }]);
+      setPeers((prev) => [
+        ...prev.filter((peer) => peer.socketId !== socketId),
+        { socketId },
+      ]);
       socket.emit('welcomeUser', { from: mySocketId, to: socketId });
     });
 
@@ -87,7 +95,10 @@ export const App = () => {
         stream,
       });
 
-      setPeers((prev) => [...prev, { socketId, peer }]);
+      setPeers((prev) => [
+        ...prev.filter((peer) => peer.socketId !== socketId),
+        { socketId, peer },
+      ]);
   
       peer.on('signal', (signal) => {
         socket.emit('callUser', { to: socketId, from: mySocketId, signal });
@@ -101,7 +112,10 @@ export const App = () => {
         stream,
       });
 
-      setPeers((prev) => [...prev.filter(({ socketId }) => socketId !== from), { socketId: from, peer }]);
+      setPeers((prev) => [
+        ...prev.filter(({ socketId }) => socketId !== from),
+        { socketId: from, peer },
+      ]);
   
       peer.on('signal', (signal) => {
         socket.emit('answerCall', { from: mySocketId, to: from, signal });
@@ -150,67 +164,21 @@ export const App = () => {
   };
 
   return (
-    <div style={{ display: 'flex', position: 'absolute', left: 0, right: 0, bottom: 0, top: 0 }}>
-      <div>
-        <audio playsInline muted ref={myAudio} autoPlay />
-        {peers.map(({ socketId, peer }) => (
-          <PeerAudio key={socketId} peer={peer} muted={!joined} />
-        ))}
-      </div>
-      <div>
-        {joined && (
-          <div>
-            Channel: <b>19</b>, Freq: <b>27,180 MHz</b><br />
-            Users: {peers.length + 1}
-          </div>
-        )}
-        {joined ? (
-          <>
-            <button
-              style={{
-                position: 'absolute',
-                top: '50px',
-                left: 0,
-                right: 0,
-                bottom: '100px',
-                backgroundColor: speaking ? '#cefad0' : undefined
-              }}
-              onMouseDown={() => toggleAudio(true)}
-              onMouseUp={() => toggleAudio(false)}
-              onTouchStart={() => toggleAudio(true)}
-              onTouchEnd={() => toggleAudio(false)}
-              disabled={micDisabled}
-            >
-              {micDisabled ? 'Someone speaking, wait...' : speaking ? 'Speaking...' : 'Press and hold to speak'}
-            </button>
-        </>
-        ) : (
-          <div style={{ width: '100vw' }}>
-            <button
-              style={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '20px',
-                borderRadius: 0,
-                border: 'none',
-                fontSize: '16px',
-              }}
-              onClick={joinChat}
-            >
-              <p>Channel: <b>19</b> (freq: <b>27,180 MHz</b>)</p>
-              <div style={{
-                height: '10px',
-                width: '10px',
-                backgroundColor: 'green',
-                borderRadius: '50%',
-              }} />
-            </button>
-            <div style={{ height: '3px', width: '100%', borderBottom: '3px solid black' }} />
-          </div>
-        )}
-      </div>
-    </div>
+    <Container>
+      <audio ref={myAudio} playsInline muted autoPlay />
+      {peers.map(({ socketId, peer }) => (
+        <PeerAudio key={socketId} peer={peer} muted={!joined} />
+      ))}
+      {joined ? (
+        <RoomContent
+          userCounter={peers.length + 1}
+          speaking={speaking}
+          micDisabled={micDisabled}
+          toggleAudio={toggleAudio}
+        />
+      ) : (
+        <RoomList joinChat={joinChat} />
+      )}
+    </Container>
   );
 }
