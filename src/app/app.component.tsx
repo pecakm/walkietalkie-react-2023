@@ -15,7 +15,8 @@ import { Container } from './app.styled';
 const socket = io(`${process.env.REACT_APP_SOCKET_URL}`);
 
 export const App = () => {
-  const [play] = useSound(wtSfx, { interrupt: true, volume: 0.5 });
+  const [play] = useSound(wtSfx, { interrupt: true, volume: 1 }); // change to 0.5 later or remove completely
+  // The state 'visibilityChanged' is needed to check if app went from background mode on iOS
   const [visibilityChanged, setVisibilityChanged] = useState(false);
   const [stream, setStream] = useState<MediaStream>();
   const [mySocketId, setMySocketId] = useState();
@@ -27,11 +28,21 @@ export const App = () => {
   const myAudio = useRef<any>();
 
   useEffect(() => {
-    document.addEventListener('visibilitychange', function() {
+    document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         setVisibilityChanged(true);
       }
     });
+
+    setInterval(() => {
+      navigator.mediaDevices.enumerateDevices().then((devices) => {
+        const availableMic = devices.find((device) => device.kind === 'audioinput' && !!device.deviceId);
+
+        if (!availableMic) {
+          setVisibilityChanged(true);
+        }
+      });
+    }, 5000);
   }, []);
 
   useEffect(() => {
